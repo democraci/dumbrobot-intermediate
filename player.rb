@@ -1,6 +1,6 @@
 class Player
 	FULL_HEALTH = 20
-	DIRECTIONS = [:foward, :right, :backward, :left]
+	DIRECTIONS = [:forward, :right, :backward, :left]
 
 	def initialize
 		@warrior = nil
@@ -9,14 +9,17 @@ class Player
 		@direction = nil
 	end
 
-	#strategy: destroy everything between me and stairs
+	#strategy: 
+	#bind every enemy first
+	#then destroy everything between me and stairs
   def play_turn(warrior)
   	@warrior = warrior
   	remember_this_turn_info
+
   	return rest! if !health_full? && !be_attacked_last_turn?
-  	return attack! if feel.enemy? 
+  	return bind! if be_attacked_last_turn? && !can_kill_all_enemy?
+  	return attack! if !feel.empty?
   	return walk! if feel.empty?
-  	walk! suitable_direction
   end
 
   def remember_this_turn_info
@@ -25,16 +28,24 @@ class Player
   	@direction = @warrior.direction_of_stairs
   end
 
-  def feel
-  	@warrior.feel @direction
+  def feel(direction=nil)
+  	direction ||= @direction
+  	@warrior.feel direction
   end
 
-  def walk!
-  	@warrior.walk! @direction
+  def walk!(direction=nil)
+  	direction ||= @direction
+  	@warrior.walk! direction
   end
 
-  def attack!
-  	@warrior.attack! @direction
+  def bind!(direction=nil)
+  	direction ||= @direction
+  	@warrior.bind! enemy_direction
+  end
+
+  def attack!(direction=nil)
+  	direction ||= @direction
+  	@warrior.attack! direction
   end
 
   def rest!
@@ -46,7 +57,16 @@ class Player
   end
 
   def be_attacked_last_turn?
-  	@current_health < @prev_health
+  	return true if @prev_health.nil?
+  	@warrior.health < @prev_health
+  end
+
+  def can_kill_all_enemy?
+  	enemy_number = DIRECTIONS.each.count do |direction|
+  		@warrior.feel(direction).enemy?
+ 		end
+
+ 		@warrior.health > enemy_number * 9
   end
 
   def suitable_direction
@@ -54,10 +74,18 @@ class Player
   	idx = stairs_direction_idx
 
   	(0..(DIRECTIONS.length - 1)).each do |increment|
-  		idx = (increment + stairs_direction_idx) % DIRECTION.length
+  		idx = (increment + stairs_direction_idx) % DIRECTIONS.length
   		break if @warrior.feel(DIRECTIONS[idx]).empty?
   	end
-  	
-  	idx
+
+  	DIRECTIONS[idx]
   end
+
+  def enemy_direction
+  	DIRECTIONS.each do |direction|
+  		return direction if @warrior.feel(direction).enemy?
+  	end
+  	:forward
+  end
+
 end
