@@ -6,86 +6,39 @@ class Player
 		@warrior = nil
 		@current_health = nil
 		@prev_health = nil
-		@direction = nil
 	end
 
-	#strategy: 
-	#bind every enemy first
-	#then destroy everything between me and stairs
   def play_turn(warrior)
-  	@warrior = warrior
-  	remember_this_turn_info
-
-  	return rest! if !health_full? && !be_attacked_last_turn?
-  	return bind! if be_attacked_last_turn? && !can_kill_all_enemy?
-  	return attack! if !feel.empty?
-  	return walk! if feel.empty?
+  	pre_process(warrior)
+  	process
+    post_process
   end
 
-  def remember_this_turn_info
-  	@prev_health = @current_health
-  	@current_health = @warrior.health
-  	@direction = @warrior.direction_of_stairs
+  def pre_process(warrior)
+    @warrior = warrior
+    @prev_health = @current_health
+    @current_health = @warrior.health
+    init_sensors
   end
 
-  def feel(direction=nil)
-  	direction ||= @direction
-  	@warrior.feel direction
+  def init_sensors
+    
   end
 
-  def walk!(direction=nil)
-  	direction ||= @direction
-  	@warrior.walk! direction
+  def init_processors
+    @wander_processor = WanderProcessor.new
+    @motor_processor = MotorProcessor.new
   end
 
-  def bind!(direction=nil)
-  	direction ||= @direction
-  	@warrior.bind! enemy_direction
+  def init_wires
+    Wires.add_sources_to_wire()
   end
 
-  def attack!(direction=nil)
-  	direction ||= @direction
-  	@warrior.attack! direction
+  def process_layers
+    avoid_bump
   end
 
-  def rest!
-  	@warrior.rest!
-  end
-
-  def health_full?
-  	@warrior.health == FULL_HEALTH
-  end
-
-  def be_attacked_last_turn?
-  	return true if @prev_health.nil?
-  	@warrior.health < @prev_health
-  end
-
-  def can_kill_all_enemy?
-  	enemy_number = DIRECTIONS.each.count do |direction|
-  		@warrior.feel(direction).enemy?
- 		end
-
- 		@warrior.health > enemy_number * 9
-  end
-
-  def suitable_direction
-  	stairs_direction_idx = DIRECTIONS.find_index(@direction)
-  	idx = stairs_direction_idx
-
-  	(0..(DIRECTIONS.length - 1)).each do |increment|
-  		idx = (increment + stairs_direction_idx) % DIRECTIONS.length
-  		break if @warrior.feel(DIRECTIONS[idx]).empty?
-  	end
-
-  	DIRECTIONS[idx]
-  end
-
-  def enemy_direction
-  	DIRECTIONS.each do |direction|
-  		return direction if @warrior.feel(direction).enemy?
-  	end
-  	:forward
+  def post_process
   end
 
 end
