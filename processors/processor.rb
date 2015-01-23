@@ -1,5 +1,6 @@
 class Processor
 	attr_reader :outcome
+	attr_read :output_wires
 
 	def initialize
 		@input_wires = []

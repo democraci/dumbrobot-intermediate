@@ -1,5 +1,7 @@
 class Wire
 	# Wire have 3 parts, input source, output destination, combine function
+	attr_read :sources, :destinations
+
 	def initialize(name = nil)
 		@sources = []
 		@destinations = []
@@ -27,12 +29,20 @@ class Wire
 		@outcome = combine_input
 	end
 
+  # there are two kinds of wire allowed in our control system
+  #  1. associated with many input sources, one destination
+  #  2. associated with many output destinations, one input source
+  # those wires which not applied to this regulation is illegal
+	def legal?
+		(wire.sources.length == 1 and wire.destinations.length >= 1) || (wire.sources.length >= 1 and wire.destinations.length == 1)
+	end
+
 	private
 	def combine_input
 		if @sources.length <= 1
 			@sources.first
 		else
-			@sources.inject { |result, source| result = @combine_func.call(result, source.outcome) }
+			@sources.map(&:outcome).inject { |result, outcome| @combine_func.call(result.outcome, source.outcome) }
 		end
 	end
 end
@@ -58,3 +68,9 @@ class Wires
 		@name_register[wire_name] ||= new(wire_name)
 	end
 end
+
+ALL_WIRES = [:command, :warrior]
+
+Wires.set_combine_func(:command, MovesOptions.method(:combine))
+Wires.set_combine_func(:warrior, lambda do |a, b| a end)
+

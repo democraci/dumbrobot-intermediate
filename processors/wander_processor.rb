@@ -1,8 +1,12 @@
 require '../payload/moves_options'
+require '../wires/wire'
+require 'processor'
 
 class WanderProcessor < Processor
-	#should processor know to which wires it connects?
-	#seems processor must know it to do process. 
+	include Singleton
+
+	Wires.add_destinations_to_wire(:warrior, self.instance)
+
 	def process
 		warrior = find_input_wire(:warrior).outcome
 		options = MovesOptions.new

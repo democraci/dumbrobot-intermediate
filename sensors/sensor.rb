@@ -1,4 +1,6 @@
-class Sensor 	
+class Sensor
+	attr_read :output_wires
+	 	
 	def initialize
 		@output_wires = []
 	end

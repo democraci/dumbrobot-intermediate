@@ -1,10 +1,15 @@
-require '../payload/action'
+require '../payload/moves_options'
+require '../wires/wire'
 require 'processor'
 
 class MotorProcessor < Processor
+	include Singleton
 
-	#process method shall know the info of wires the processor connets to
-	#which is strong coupled
+	#process method shall know the info of wires the processor connets to, which is strong coupled
+	#so we need declare the connection here
+	Wires.add_destinations_to_wire(:command, self.instance)
+	Wires.add_destinations_to_wire(:warrior, self.instance)
+
 	def process
 		command_options = find_input_wire(:command).outcome
 		warrior = find_input_wire(:warrior).outcome
