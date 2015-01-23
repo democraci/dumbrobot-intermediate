@@ -1,7 +1,6 @@
-class Player
-	FULL_HEALTH = 20
-	DIRECTIONS = [:forward, :right, :backward, :left]
+require 'robust_layer_control_system'
 
+class Player
 	def initialize
 		@warrior = nil
 		@current_health = nil
@@ -32,7 +31,7 @@ class Player
     WarriorSensor.instance.set_warrior @warrior
   end
 
-  def compute
+  def processors_compute
     in_degrees = {}
     wires = ALL_WIRES.dup
     nodes = []
@@ -76,6 +75,7 @@ class Player
   end
 
   def post_process
+    puts "************************* DONE "
   end
 
 end

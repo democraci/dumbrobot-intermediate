@@ -1,6 +1,7 @@
-require '../payload/moves_options'
-require '../wires/wire'
-require 'processor'
+require 'singleton'
+require File.dirname(__FILE__) + '/../payload/moves_options'
+require File.dirname(__FILE__) + '/../wires/wire'
+require File.dirname(__FILE__) + '/processor'
 
 class WanderProcessor < Processor
 	include Singleton

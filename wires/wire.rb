@@ -1,8 +1,10 @@
+require File.dirname(__FILE__) + '/../payload/moves_options.rb'
+
 class Wire
 	# Wire have 3 parts, input source, output destination, combine function
-	attr_read :sources, :destinations
+	attr_reader :sources, :destinations, :name
 
-	def initialize(name = nil)
+	def initialize(name)
 		@sources = []
 		@destinations = []
 		@combine_func = nil
@@ -13,12 +15,12 @@ class Wire
 
 	def add_sources(*sources)
 		@sources += sources
-		sources.each { |src| src.send(:add_output_wire, self) }
+		sources.each { |src| src.send(:add_output_wires, self) }
 	end
 
 	def add_destinations(*destinations)
 		@destinations += destinations
-		destinations.each { |dest| dest.send(:add_input_wire, self) }
+		destinations.each { |dest| dest.send(:add_input_wires, self) }
 	end
 
 	def set_combine_func(func)
@@ -34,7 +36,7 @@ class Wire
   #  2. associated with many output destinations, one input source
   # those wires which not applied to this regulation is illegal
 	def legal?
-		(wire.sources.length == 1 and wire.destinations.length >= 1) || (wire.sources.length >= 1 and wire.destinations.length == 1)
+		(@sources.length == 1 and @destinations.length >= 1) || (@sources.length >= 1 and @destinations.length == 1)
 	end
 
 	private
@@ -65,12 +67,12 @@ class Wires
 
 	def self.find_or_create wire_name
 		@name_register ||= {}
-		@name_register[wire_name] ||= new(wire_name)
+		@name_register[wire_name] ||= Wire.new(wire_name)
 	end
 end
 
 ALL_WIRES = [:command, :warrior]
 
-Wires.set_combine_func(:command, MovesOptions.method(:combine))
-Wires.set_combine_func(:warrior, lambda do |a, b| a end)
+Wires.set_combine_func_to_wire(:command, MovesOptions.method(:combine))
+Wires.set_combine_func_to_wire(:warrior, lambda do |a, b| a end)
 

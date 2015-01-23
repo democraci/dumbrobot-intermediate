@@ -1,6 +1,6 @@
-require '../payload/moves_options'
-require '../wires/wire'
-require 'sensor'
+require 'singleton'
+require File.dirname(__FILE__) + '/../wires/wire'
+require File.dirname(__FILE__) + '/sensor'
 
 class WarriorSensor < Sensor
 	include Singleton
