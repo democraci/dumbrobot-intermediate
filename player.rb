@@ -51,7 +51,9 @@ class Player
 
   def avoid_goto_stairs_unready
     remain_spaces = @warrior.listen
+    binding.pry
     return if remain_spaces.empty?
+
     unless remain_spaces.find { |space| !space.stairs? }.empty?
       each_direction do |direction|
         next unless @warrior.feel(direction).stairs?
@@ -132,15 +134,15 @@ class Player
   end
 
   def active_enemy?(space)
-    space.enemy? && !space.captive?
+    space.enemy? && !space.captive? && History.enemy_locations.add(space.location)
   end
 
   def captive_enemy?(space)
-    space.enemy? && space.captive?
+    space.captive? && History.enemy_locations.include?(space.location)
   end
 
   def captive_innocent?(space)
-    !space.enemy? && space.captive?
+    space.captive? && !History.enemy_locations.include?(space.location)
   end
 
   def direction_of_next_goal

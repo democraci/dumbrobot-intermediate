@@ -13,6 +13,10 @@ class History
       @health_history ||= []
     end
 
+    def enemy_locations
+      @enemy_locations ||= Set.new
+    end
+
     def max_health
       @max_health
     end
