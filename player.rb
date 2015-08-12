@@ -1,81 +1,195 @@
-require 'robust_layer_control_system'
+require 'moves_options'
+require 'history'
+require 'pry'
+
+def debug_msg(msg)
+  puts "DEBUG:  #{msg}"
+end
 
 class Player
-	def initialize
-		@warrior = nil
-		@current_health = nil
-		@prev_health = nil
-	end
+  AVOID = 5
+  REST = 4
+  UNBIND = 3
+  PLAN = 2
 
   def play_turn(warrior)
-  	pre_process(warrior)
+  	init_env(warrior)
   	process
-    post_process
+    take_action
   end
 
-  def pre_process(warrior)
+  # init env
+  def init_env(warrior)
     @warrior = warrior
-    @prev_health = @current_health
-    @current_health = @warrior.health
+    @current_move_opts = MovesOptions.new
   end
 
-  # process workflow
-  #  1. init sensor, collect env data
-  #  2. use BFS compute by processor
   def process
-    init_sensors
-    processors_compute
+    # process each layer
+    avoid_unneccessary_move
+    rest_if_tired
+    unbind_captives
+    destroy_nearby_enemy
   end
 
-  def init_sensors
-    WarriorSensor.instance.set_warrior @warrior
+  def avoid_unneccessary_move
+    avoid_unneccessary_attack
+    avoid_goto_stairs_unready
+    avoid_unneccessary_walk
+    avoid_unneccessary_bind
+    avoid_unneccessary_rescue
+    avoid_unneccessary_rest
   end
 
-  def processors_compute
-    in_degrees = {}
-    wires = ALL_WIRES.dup
-    nodes = []
-
-    wires.each do |wire_name|
-      wire = Wires.find_or_create wire_name
-      raise "illegal wire found: #{wire.name}, sources: #{wire.sources}, destinations: #{wire.destinations}" unless wire.legal?
-      wire.destinations.each do |dest| 
-        in_degrees[dest] ||= 0
-        in_degrees[dest] += 1
-      end
-      nodes += wire.sources
-      nodes += wire.destinations
-    end
-    nodes.uniq!
-    zero_in_degree_nodes = nodes - in_degrees.keys
-
-    # use BFS compute processor by processor
-    bfs_compute(zero_in_degree_nodes, nodes, in_degrees)
-  end
-
-  def bfs_compute(zero_in_degree_nodes, nodes, in_degrees)
-    raise "illegal control system: not a directed acyclic graph" if zero_in_degree_nodes.empty? && !nodes.empty?
-    return if nodes.empty?
-
-    zero_in_degree_nodes.each { |node| node.process }
-
-    zero_in_degree_nodes.each do |node| 
-      node.output_wires.each do |wire|
-        wire.destinations.each do |dest|
-          in_degrees[dest] -= 1
-        end
+  def avoid_unneccessary_attack
+    each_direction do |direction|
+      unless @warrior.feel(direction).enemy?
+        @current_move_opts.drop_moves_by_direction(:attack!, direction)
       end
     end
-
-    zero_in_degree_nodes = in_degrees.keys.select{ |node, in_degree| in_degree == 0}.keys
-    zero_in_degree_nodes.each { |node| in_degrees.delete node }
-    nodes -= zero_in_degree_nodes
-
-    bfs_compute(zero_in_degree_nodes, in_degrees, nodes, in_degrees)
   end
 
-  def post_process
-    puts "************************* DONE "
+  def avoid_goto_stairs_unready
+    remain_spaces = @warrior.listen
+    return if remain_spaces.empty?
+    unless remain_spaces.find { |space| !space.stairs? }.empty?
+      each_direction do |direction|
+        next unless @warrior.feel(direction).stairs?
+        @current_move_opts.drop_moves_by_direction(:walk!, direction)
+      end
+    end
+  end
+
+  def avoid_unneccessary_walk
+    each_direction do |direction|
+      unless @warrior.feel(direction).empty?
+        @current_move_opts.drop_moves_by_direction(:walk!, direction)
+      end
+    end
+  end
+
+  def avoid_unneccessary_bind
+    each_direction do |direction|
+      unless @warrior.feel(direction).enemy?
+        @current_move_opts.drop_moves_by_direction(:bind!, direction)
+      end
+    end
+  end
+
+  def avoid_unneccessary_rescue
+    each_direction do |direction|
+      unless @warrior.feel(direction).captive?
+        @current_move_opts.drop_moves_by_direction(:rescue!, direction)
+      end
+    end
+  end
+
+  def avoid_unneccessary_rest
+    if health_full? 
+      @current_move_opts.drop_moves(:rest!)
+    end
+  end
+
+  def rest_if_tired
+    return if health_full?
+    return if nearby_active_enemy_cnt != 0
+    return if @warrior.health > History.max_health/4 && History.move_history.last[0] != :rest!
+    @current_move_opts.emphasize_moves_by_direction(:rest!, :here, REST)
+  end
+
+  def unbind_captives
+    each_direction do |direction|
+      @current_move_opts.emphasize_moves_by_direction(:rescue!, direction, UNBIND) if captive_innocent?(@warrior.feel(direction))
+    end
+  end
+
+  def destroy_nearby_enemy
+    case nearby_active_enemy_cnt
+    when 1
+      each_direction do |direction|
+        @current_move_opts.emphasize_moves_by_direction(:attack!, direction, PLAN) if active_enemy?(@warrior.feel(direction))
+      end
+    when 0
+      each_direction do |direction|
+        @current_move_opts.emphasize_moves_by_direction(:attack!, direction, PLAN) if captive_enemy?(@warrior.feel(direction))
+      end
+      @current_move_opts.emphasize_moves_by_direction(:walk!, direction_of_next_goal, PLAN)
+    else
+      each_direction do |direction|
+        @current_move_opts.emphasize_moves_by_direction(:bind!, direction, PLAN) if active_enemy?(@warrior.feel(direction))
+      end
+    end
+  end
+
+  def nearby_active_enemy_cnt
+    cnt = 0
+    each_direction do |direction|
+      space = @warrior.feel(direction)
+      cnt += 1 if active_enemy?(space)
+    end
+
+    cnt
+  end
+
+  def active_enemy?(space)
+    space.enemy? && !space.captive?
+  end
+
+  def captive_enemy?(space)
+    space.enemy? && space.captive?
+  end
+
+  def captive_innocent?(space)
+    !space.enemy? && space.captive?
+  end
+
+  def direction_of_next_goal
+    @warrior.direction_of(@warrior.listen.first)
+  rescue
+    @warrior.direction_of_stairs
+  end
+
+
+  def goto_nearby_stairs
+    MovesOptions::DIRECTIONS.each do |direction|
+      next unless @warrior.feel(direction).stairs?
+      
+      (MovesOptions::MOVES - [:walk!]).each do |move|
+        @current_move_opts.drop_moves(move)
+      end
+
+      (MovesOptions::DIRECTIONS - [direction]).each do |dir|
+        @current_move_opts.drop_moves_by_direction(:walk!, dir)
+      end
+    end
+  end
+
+  def take_action
+    candidate_moves = @current_move_opts.candidate_moves
+
+    raise "No available action found" if candidate_moves.length == 0
+
+    move = candidate_moves[rand(candidate_moves.length)]
+    History.update_history(@warrior, move)
+
+
+    if move.first == :rest!
+      @warrior.send(:rest!)
+    else
+      @warrior.send(move[0], move[1])
+    end
+  end
+
+  def health_full?
+    return true if History.first_round?
+
+    return History.max_health == @warrior.health
+  end
+
+  def each_direction
+    MovesOptions::DIRECTIONS.each do |direction|
+      yield direction if block_given?
+    end
   end
 
 end
